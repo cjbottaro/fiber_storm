@@ -1,9 +1,35 @@
 = fiber_storm
 
-Description goes here.
+Thread pool pattern for evented (Eventmachine) fibers.
+
+== Quick Start
+
++fiber_storm+ is more or less only useful under +eventmachine+.
+
+  require "fiber_storm"
+  require "eventmachine"
+  
+  EM.run do
+    FiberStorm.new(:size => 2) do |storm|
+      start_time = Time.now
+      3.times do
+        storm.execute do
+          storm.sleep(1) # Fiber aware sleep.
+          puts "#{Fiber.current} slept for 1 second"
+        end
+      end
+      storm.join
+      puts "Running time: " + (Time.now - start_time).to_s
+      EM.stop
+    end
+  end
+
+== Credits
+
+Some concepts borrowed from {em-synchrony}[https://github.com/igrigorik/em-synchrony].
 
 == Contributing to fiber_storm
- 
+
 * Check out the latest master to make sure the feature hasn't been implemented or the bug hasn't been fixed yet
 * Check out the issue tracker to make sure someone already hasn't requested it and/or contributed it
 * Fork the project

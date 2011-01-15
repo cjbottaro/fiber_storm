@@ -15,8 +15,8 @@ Jeweler::Tasks.new do |gem|
   gem.name = "fiber_storm"
   gem.homepage = "http://github.com/cjbottaro/fiber_storm"
   gem.license = "MIT"
-  gem.summary = %Q{TODO: one-line summary of your gem}
-  gem.description = %Q{TODO: longer description of your gem}
+  gem.summary = %Q{Thread pool pattern ported to evented (Eventmachine) fibers.}
+  gem.description = %Q{You like threads and thread pooling, but hear event driven programming is the latest rage.}
   gem.email = "cjbottaro@alumni.cs.utexas.edu"
   gem.authors = ["Christopher J Bottaro"]
   # Include your dependencies below. Runtime dependencies are required when using your gem,

@@ -1,10 +1,17 @@
+require "fiber_storm/logging"
+require "fiber_storm/magic"
+
 class FiberStorm
   class Worker
     attr_reader :fiber
     
-    def initialize(queue, storm)
+    include Magic
+    include Logging
+    
+    def initialize(queue, storm, logger)
       @queue = queue
       @storm = storm
+      @logger = logger
       @busy  = false
       @fiber = Fiber.new{ run }
     end
@@ -19,7 +26,13 @@ class FiberStorm
         execution.execute
       else
         @busy = false
-        Fiber.yield
+        if @storm.waiting?(:execute) or @storm.transferred?
+          logger.debug "tranferring"
+          transfer(@storm)
+        else
+          logger.debug "yielding"
+          Fiber.yield
+        end
       end
     end
     

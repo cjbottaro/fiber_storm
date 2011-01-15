@@ -9,6 +9,7 @@ GEM
       rake
     rake (0.8.7)
     rcov (0.9.9)
+    rr (1.0.2)
 
 PLATFORMS
   ruby
@@ -18,3 +19,4 @@ DEPENDENCIES
   eventmachine (~> 0.12.10)
   jeweler (~> 1.5.2)
   rcov
+  rr (~> 1.0.2)

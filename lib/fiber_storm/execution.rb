@@ -5,18 +5,20 @@ class FiberStorm
     
     include Magic
     
+    attr_reader :fiber
+    
     def initialize(*args, &block)
       @args       = args
       @block      = block
       @finished   = false
       @exception  = nil
-      @join_fiber = nil
+      @fiber      = Fiber.current
     end
     
     def execute
       @block.call(@args)
       @finished = true
-      proceed(:join)
+      waiter(:join).resume if waiting?(:join)
     end
     
     def finished?

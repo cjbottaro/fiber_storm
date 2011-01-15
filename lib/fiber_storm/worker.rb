@@ -26,18 +26,15 @@ class FiberStorm
         execution.execute
       else
         @busy = false
-        if @storm.waiting?(:execute) or @storm.transferred?
-          logger.debug "tranferring"
+        if @storm.waiting?(:execute)
+          transfer(@storm)
+        elsif @storm.transferred?
           transfer(@storm)
         else
           logger.debug "yielding"
           Fiber.yield
         end
       end
-    end
-    
-    def resume
-      @fiber.resume
     end
     
     def alive?

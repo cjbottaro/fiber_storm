@@ -76,11 +76,7 @@ private
   
   def resume_idle_worker
     idle_worker = @workers.detect{ |worker| worker.idle? } or return
-    if idle_worker.transferred?
-      transfer(idle_worker)
-    else
-      resume(idle_worker)
-    end
+    switch(idle_worker)
   end
   
 end

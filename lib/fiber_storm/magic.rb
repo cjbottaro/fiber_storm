@@ -17,19 +17,31 @@ class FiberStorm
       !!waiter(name)
     end
     
+    def switch(object, *args)
+      if object.transferred?
+        logger.debug "transfer => #{fiber_for(object)}"
+        transfer(object, *args)
+      else
+        logger.debug "resume => #{fiber_for(object)}"
+        resume(object, *args)
+      end
+    end
+    
     def resume(object, *args)
-      fiber = object.instance_of?(Fiber) ? object : object.fiber
-      fiber.resume(*args)
+      fiber_for(object).resume(*args)
     end
     
     def transfer(object, *args)
-      fiber = object.instance_of?(Fiber) ? object : object.fiber
       @transferred = true
-      fiber.transfer(*args).tap{ @transferred = false }
+      fiber_for(object).transfer(*args).tap{ @transferred = false }
     end
     
     def transferred?
       @transferred
+    end
+    
+    def fiber_for(object)
+      object.instance_of?(Fiber) ? object : object.fiber
     end
     
   end

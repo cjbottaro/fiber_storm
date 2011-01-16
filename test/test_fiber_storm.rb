@@ -33,7 +33,7 @@ class TestFiberStorm < Test::Unit::TestCase
   
   def test_execute_blocks
     FiberStorm.new :size => 2, :execute_blocks => true do |storm|
-      mock.proxy(storm).wait(:execute)
+      mock.proxy(storm.instance_eval{@cond}).wait
       count = 0
       
       storm.execute do

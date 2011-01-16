@@ -1,9 +1,7 @@
-require "fiber_storm/magic"
+require "fiber_storm/fiber_condition_variable"
 
 class FiberStorm
   class Execution
-    
-    include Magic
     
     STATE_INITIALIZED = 0
     STATE_QUEUED      = 1
@@ -46,6 +44,7 @@ class FiberStorm
       @finished     = false
       @exception    = nil
       @fiber        = Fiber.current
+      @cond         = FiberConditionVariable.new
       
       enter_state(STATE_INITIALIZED)
     end
@@ -94,11 +93,11 @@ class FiberStorm
         @exception = e
       end
       enter_state(STATE_FINISHED)
-      waiter(:join).resume if waiting?(:join)
+      @cond.signal
     end
     
     def join
-      wait if not finished?
+      @cond.wait if not finished?
     end
     
   private

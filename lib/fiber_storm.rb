@@ -1,7 +1,8 @@
 require "fiber"
+require "fiber_storm/fiber_condition_variable"
 require "fiber_storm/execution"
 require "fiber_storm/logging"
-require "fiber_storm/magic"
+require "fiber_storm/profiling"
 require "fiber_storm/worker"
 
 class FiberStorm
@@ -15,8 +16,8 @@ class FiberStorm
     :em_run => true
   }
   
-  include Magic
   include Logging
+  include Profiling
   
   def initialize(options = {}, &block)
     @options    = DEFAULTS.merge(options)
@@ -25,6 +26,7 @@ class FiberStorm
     @executions = []
     @logger     = @options[:logger]
     @workers    = @options[:size].times.collect{ Worker.new(@queue, self, @logger) }
+    @cond       = FiberConditionVariable.new
     run(&block) if block_given?
   end
   
@@ -45,12 +47,7 @@ class FiberStorm
       execution = args.first
     end
     
-    if options[:execute_blocks] and not idle_worker?
-      time = Time.now
-      wait(:execute)
-      elapsed = Time.now - time
-      logger.debug "execute blocked for #{elapsed} seconds"
-    end
+    block_execute if execute_should_block?
     
     @executions << execution
     @queue << execution
@@ -74,9 +71,20 @@ private
     @workers.any?{ |worker| worker.idle? }
   end
   
+  def idle_worker
+    @workers.detect{ |worker| worker.idle? }
+  end
+  
   def resume_idle_worker
-    idle_worker = @workers.detect{ |worker| worker.idle? } or return
-    switch(idle_worker)
+    idle_worker.tap{ |worker| worker.resume if worker }
+  end
+  
+  def block_execute
+    profile("execute blocked %t"){ @cond.wait }
+  end
+  
+  def execute_should_block?
+    options[:execute_blocks] and not idle_worker?
   end
   
 end

@@ -12,7 +12,7 @@ class FiberStorm
     
     # Asynchronously signal the waiting fiber to run.
     def signal
-      @fiber.tap{ |fiber| EM::Timer.new(0){ fiber.resume } if fiber }
+      @fiber.tap{ |fiber| EM::next_tick{ fiber.resume } if fiber }
     end
     
   end

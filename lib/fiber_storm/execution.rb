@@ -1,4 +1,5 @@
 require "fiber_storm/fiber_condition_variable"
+require "fiber_storm/timeout"
 
 class FiberStorm
   class Execution
@@ -76,7 +77,7 @@ class FiberStorm
     end
     
     def timeout?
-      finished? and exception.kind_of?(Timeout::Error)
+      finished? and exception.kind_of?(TimeoutError)
     end
     
     def failure?
@@ -87,7 +88,7 @@ class FiberStorm
       enter_state(STATE_STARTED)
       begin
         do_execute
-      rescue Timeout::Error => e
+      rescue TimeoutError => e
         @exception = e
       rescue StandardError => e
         @exception = e
@@ -104,7 +105,7 @@ class FiberStorm
     
     def do_execute
       if options[:timeout]
-        Timeout.timeout(options[:timeout]){ @block.call(@args) }
+        FiberStorm.timeout(options[:timeout]){ @block.call(@args) }
       else
         @block.call(@args)
       end

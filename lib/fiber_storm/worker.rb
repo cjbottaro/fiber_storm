@@ -5,6 +5,7 @@ class FiberStorm
     attr_reader :fiber
     
     include Logging
+    include Profiling
     
     def initialize(queue, storm, logger)
       @queue = queue
@@ -21,7 +22,7 @@ class FiberStorm
     def run_loop
       if (execution = @queue.shift)
         @busy = true
-        execution.execute
+        profile("execute %t"){ execution.execute }
       else
         @busy = false
         @storm.instance_eval{@cond}.signal

@@ -27,7 +27,6 @@ class TestFiberStorm < Test::Unit::TestCase
       storm.join
       assert_equal 3, count
       
-      EM.stop
     end
   end
   
@@ -61,7 +60,20 @@ class TestFiberStorm < Test::Unit::TestCase
       assert_equal 4, count
       
       storm.join
-      EM.stop
+    end
+  end
+  
+  def test_timeout
+    FiberStorm.new :size => 2, :timeout => 0.1 do |storm|
+      execution = storm.execute{ storm.sleep(1) }
+      storm.join
+      assert execution.timeout?
+    end
+    
+    FiberStorm.new :size => 2, :timeout => 1 do |storm|
+      execution = storm.execute{ storm.sleep(0.1) }
+      storm.join
+      assert ! execution.timeout?
     end
   end
   

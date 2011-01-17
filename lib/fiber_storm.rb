@@ -1,9 +1,16 @@
+# Ruby requires.
 require "fiber"
+
+# Gem requires.
+require "eventmachine"
+
+# Lib requires.
 require "fiber_storm/fiber_condition_variable"
 require "fiber_storm/execution"
 require "fiber_storm/logging"
 require "fiber_storm/profiling"
 require "fiber_storm/worker"
+require "fiber_storm/timeout"
 
 class FiberStorm
   
@@ -12,12 +19,19 @@ class FiberStorm
   DEFAULTS = {
     :size => 2,
     :execute_blocks => false,
+    :timeout => nil,
     :logger => nil,
-    :em_run => true
+    :em_run => true,
+    :em_stop => true
   }
   
   include Logging
   include Profiling
+  extend FiberStorm::Timeout
+  
+  class << self
+    public :timeout
+  end
   
   def initialize(options = {}, &block)
     @options    = DEFAULTS.merge(options)
@@ -32,7 +46,10 @@ class FiberStorm
   
   def run(options = {}, &block)
     options = @options.merge(options)
-    @fiber = Fiber.new{ yield(self) }
+    @fiber = Fiber.new do
+      yield(self)
+      EM.stop if options[:em_stop]
+    end
     if options[:em_run]
       EM.run{ @fiber.resume }
     else
@@ -47,22 +64,30 @@ class FiberStorm
       execution = args.first
     end
     
+    execution.options.replace(options.dup)
+    
     block_execute if execute_should_block?
     
     @executions << execution
     @queue << execution
     
     resume_idle_worker
+    
+    execution
   end
   
   def join
     @executions.each{ |execution| execution.join }
   end
   
-  def sleep(seconds)
+  def self.sleep(seconds)
     f = Fiber.current
     EM::Timer.new(seconds){ f.resume }
     Fiber.yield
+  end
+  
+  def sleep(seconds)
+    self.class.sleep(seconds)
   end
   
 private

@@ -14,7 +14,7 @@ require "fiber_storm/timeout"
 
 class FiberStorm
   
-  attr_reader :options, :fiber
+  attr_reader :options
   
   attr_reader :executions
   
@@ -37,7 +37,6 @@ class FiberStorm
   
   def initialize(options = {}, &block)
     @options    = DEFAULTS.merge(options)
-    @fiber      = Fiber.current
     @queue      = []
     @executions = []
     @logger     = @options[:logger]
@@ -48,14 +47,14 @@ class FiberStorm
   
   def run(options = {}, &block)
     options = @options.merge(options)
-    @fiber = Fiber.new do
+    fiber = Fiber.new do
       yield(self)
       EM.stop if options[:em_stop]
     end
     if options[:em_run]
-      EM.run{ @fiber.resume }
+      EM.run{ fiber.resume }
     else
-      @fiber.resume
+      fiber.resume
     end
   end
   

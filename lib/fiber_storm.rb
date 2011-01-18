@@ -14,8 +14,10 @@ require "fiber_storm/timeout"
 
 class FiberStorm
   
+  # The options passed into FiberStorm.new.
   attr_reader :options
   
+  # Every call to #execute will result in an execution being appended to this array.
   attr_reader :executions
   
   DEFAULTS = {
@@ -35,6 +37,18 @@ class FiberStorm
     public :timeout
   end
   
+  # call-seq:
+  #   new(options = {}){ |storm| ... }
+  #
+  # Create a new FiberStorm.  Valid _options_ are:
+  # [:size] How many fibers in the fiber pool. In other words, the max concurrency level. Default is 2.
+  # [:execute_blocks] If true, then #execute will block until a fiber is available. Default is false.
+  # [:timeout] How long an execution can run before an attempt is made to aborted it. Default is nil (no timeout).
+  # [:em_run] If true, then call EM.run at the beginning of #run. Default is true.
+  # [:em_stop] If true, then call EM.stop at the end of #run. Default is true.
+  # [:logger] Specify a Logger object. Default is nil (no logging).
+  # If called with a block, then it is the same as:
+  #   FiberStorm.new(options).run{ |storm| ... }
   def initialize(options = {}, &block)
     @options    = DEFAULTS.merge(options)
     @queue      = []
@@ -45,8 +59,11 @@ class FiberStorm
     run(&block) if block_given?
   end
   
-  def run(options = {}, &block)
-    options = @options.merge(options)
+  # call-seq:
+  #   run{ |storm| ... }
+  # Wrap the block in a fiber and calls to EM.run and EM.stop (if specified in the options passed to
+  # FiberStorm.new).
+  def run(&block)
     fiber = Fiber.new do
       yield(self)
       EM.stop if options[:em_stop]
@@ -58,9 +75,40 @@ class FiberStorm
     end
   end
   
+  # call-seq:
+  #   execution(options = {})
+  #   execution(*args){ |*args| ... }
+  #
+  # Create a new Execution, passing it the options from this FiberStorm instance.  If called with
+  # an _options_ hash, then it is the same as:
+  #   Execution.new(storm.options.merge(options))
+  # If it is called with a block, then it is the same as:
+  #   Execution.new(storm.options).define(*args){ |*args| ... }
+  def execution(*args, &block)
+    if block_given?
+      Execution.new(options).define(*args, &block)
+    elsif args.length == 1
+      Execution.new(options.merge(args.first))
+    elsif args.length == 0
+      Execution.new(options)
+    else
+      raise ArgumentError, "invalid call-seq"
+    end
+  end
+  
+  alias_method :new_execution, :execution
+  
+  # call-seq:
+  #   execute(execution)
+  #   execute(*args){ |*args| ... }
+  #
+  # Schedule an Execution to be run.  The execution will be added to the executions array immediately,
+  # and run as soon as a fiber is available.  If called with a block, then it is the same as:
+  #   execution = storm.execution(*args){ |*args| ... }
+  #   storm.execute(execution)
   def execute(*args, &block)
     if block_given?
-      execution = Execution.new(*args, &block)
+      execution = self.execution(*args, &block)
     else
       execution = args.first
     end
@@ -78,17 +126,20 @@ class FiberStorm
     execution
   end
   
+  # Block until all scheduled executions have finished.
   def join
     @executions.each{ |execution| execution.join }
   end
   
+  # Fiber aware sleep.  Do not call Kernel.sleep; it will halt the entire program.
   def self.sleep(seconds)
     f = Fiber.current
     EM::Timer.new(seconds){ f.resume }
     Fiber.yield
   end
   
-  def sleep(seconds)
+  # Fiber aware sleep.
+  def sleep(seconds) #:nodoc:
     self.class.sleep(seconds)
   end
   

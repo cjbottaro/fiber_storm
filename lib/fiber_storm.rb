@@ -16,6 +16,8 @@ class FiberStorm
   
   attr_reader :options, :fiber
   
+  attr_reader :executions
+  
   DEFAULTS = {
     :size => 2,
     :execute_blocks => false,
@@ -70,6 +72,7 @@ class FiberStorm
     
     @executions << execution
     @queue << execution
+    execution.send(:enter_state, Execution::STATE_QUEUED)
     
     resume_idle_worker
     

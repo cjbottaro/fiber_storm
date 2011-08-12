@@ -142,6 +142,41 @@ class FiberStorm
   def sleep(seconds) #:nodoc:
     self.class.sleep(seconds)
   end
+
+  # Removes executions stored at FiberStorm#executions.  You can selectively remove
+  # them by passing in a block or a symbol.  The following two lines are equivalent.
+  #   storm.clear_executions(:finished?)
+  #   storm.clear_executions{ |e| e.finished? }
+  def clear_executions(method_name = nil, &block)
+    cleared   = []
+    remaining = []
+    @executions.each do |execution|
+      if block_given?
+        if yield(execution)
+          cleared << execution
+        else
+          remaining << execution
+        end
+      elsif method_name.nil?
+        cleared << execution
+      else
+        if execution.send(method_name)
+          cleared << execution
+        else
+          remaining << execution
+        end
+      end
+    end
+    @executions = remaining
+    cleared
+  end
+
+  # Returns an array of Ruby fibers in the pool.
+  def fibers
+    @workers.collect{ |worker| worker.fiber }
+  end
+
+  alias_method :primitives, :fibers
   
 private
 

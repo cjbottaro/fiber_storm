@@ -11,54 +11,47 @@ class FiberStorm
     # if block takes longer than _seconds_ to finish.
     # 
     # WARNING:  This timeout implementation relies on cooperative concurrency.  If the block does not
-    # ever call Fiber.yield, then the timeout code will never get a chance to run.  For example:
-    #   timeout(1){ 100000.times{ rand * rand } }
-    # will never timeout.  The block will simply run until it is finished and +timeout+ will
-    # return without error.
+    #           ever call Fiber.yield, then the timeout code will never get a chance to run.  For
+    #           example:
+    #             timeout(1){ 100000.times{ rand * rand } }
+    #           will never timeout.  The block will simply run until it is finished and +timeout+ will
+    #           return without error.
+    #
+    # WARNING:  Every block you run within this timeout method will be run on a new fiber.  This may
+    #           wreak havor on most fibered implementations of ActiveRecord's ConnectionPool.
     #
     # You can use this method direct via +FiberStorm.timeout+ or include FiberStorm::Timeout in a
     # class or module.
     def timeout(seconds, &block)
-       cond = FiberConditionVariable.new
-       
-       fiber = Fiber.new do
-         block.call(seconds)
-         cond.signal
-       end
-       fiber.resume
-       
-       # By this point, one of two things have happened:
-       # 1)  fiber is completely done running, if so, we're done here.
-       # 2)  fiber has yielded, but still has code to run.
-       
-       return unless fiber.alive?
-       
-       # Ok, so fiber is still alive.  We set a timer and wait (yield).
-       
-       timer = EM::Timer.new(seconds){ cond.signal } and cond.wait
-       
-       # Ok, we're back from waiting (yielding).  Either the timer resumed us or fiber did.
-       
-       if fiber.alive?
-         # If fiber is still alive, that means the timer resumed us.
-         
-         # I don't really know how to "kill" a fiber.  Overriding its resume method to do
-         # nothing seems work pretty well (the next time EventMachine tries to resume it,
-         # nothing will happen).  Note, I tried overriding resume to call Fiber.yield, but
-         # got errors about the root fiber yielding.
-         def fiber.resume; nil; end
-         
-         # Unfortunatley, I don't know how to get a stack trace of where a
-         # fiber is yielded, so we just raise the TimeoutError from here.
-         raise TimeoutError, "execution expired"
-       
-       else
-         # fiber is finished (not alive), that means it resumed us.
-         
-         timer.cancel # No need for the timer anymore.
-       end
-       
-     end
+      me = Fiber.current
+      timer = EM::Timer.new(seconds){ me.resume(:timeout) }
+
+      them = Fiber.new do
+        begin
+          block.call(seconds)
+        rescue Exception => e
+          me.resume(e)
+        else
+          me.resume(:success)
+        end
+      end
+      EM.next_tick{ them.resume }
+
+      case result = Fiber.yield
+      when :success
+        timer.cancel
+      when :timeout
+        # I don't really know how to "kill" a fiber.  Overriding its resume method to do
+        # nothing seems work pretty well (the next time EventMachine tries to resume it,
+        # nothing will happen).  Note, I tried overriding resume to call Fiber.yield, but
+        # got errors about the root fiber yielding.
+        def them.resume(*args); nil; end
+        raise TimeoutError, "execution expired"
+      when Exception
+        timer.cancel
+        raise(result)
+      end
+    end
     
     module_function :timeout
     

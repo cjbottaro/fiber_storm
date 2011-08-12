@@ -19,7 +19,6 @@ Jeweler::Tasks.new do |gem|
   gem.description = %Q{You like threads and thread pooling, but hear event driven programming is the latest rage.}
   gem.email = "cjbottaro@alumni.cs.utexas.edu"
   gem.authors = ["Christopher J Bottaro"]
-  gem.add_runtime_dependency 'eventmachine', '~> 0.12'
   # Include your dependencies below. Runtime dependencies are required when using your gem,
   # and development dependencies are only needed for development (ie running rake tasks, tests, etc)
   #  gem.add_runtime_dependency 'jabber4r', '> 0.1'

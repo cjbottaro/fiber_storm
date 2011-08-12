@@ -20,9 +20,13 @@ class FiberStorm
       :started      => STATE_STARTED,
       :finished     => STATE_FINISHED
     }
+
+    STATE_SYMBOLS_INVERTED = STATE_SYMBOLS.invert
     
     # The fiber that this execution was run on.
     attr_reader :fiber
+
+    alias_method :primitive, :fiber
     
     # The options for this execution.
     attr_reader :options
@@ -32,6 +36,9 @@ class FiberStorm
     
     # The execution's current state.
     attr_reader :state
+    
+    # The execution's arguments.
+    attr_reader :args
     
     # call-seq:
     #   new(options = {})
@@ -62,10 +69,11 @@ class FiberStorm
       end
       
       @state        = nil
-      @state_times  = {}
+      @state_at     = []
       @finished     = false
       @exception    = nil
       @cond         = FiberConditionVariable.new
+      @callback_exceptions = {}
       
       enter_state(STATE_INITIALIZED)
     end
@@ -136,6 +144,37 @@ class FiberStorm
     def join
       @cond.wait if not finished?
     end
+
+    def callback_exception?
+      not @callback_exceptions.values.compact.empty?
+    end
+
+    def callback_exception(state = nil)
+      if state
+        @callback_exceptions[state]
+      else
+        @callback_exceptions
+      end
+    end
+    
+    # How long an execution was (or has been) in a given state.
+    # _state_ can be either a state constant or symbol.
+    def duration(state = :started)
+      state = state_to_const(state)
+      if state == @state
+        Time.now - state_at(state)
+      elsif state < @state and state_at(state)
+        next_state_at(state) - state_at(state)
+      else
+        nil
+      end
+    end
+
+    # Returns the time when the execution entered the given state.
+    # _state_ can be either a state constant or symbol.
+    def state_at(state)
+      @state_at[state_to_const(state)]
+    end
     
   private
     
@@ -148,8 +187,45 @@ class FiberStorm
     end
     
     def enter_state(state)
-      @state_times[state] = Time.now
+      @state_at[state] = Time.now
       @state = state
+
+      # Handle callback if any.
+      state_name = state_to_sym(state)
+      callback = options["#{state_name}_callback".to_sym]
+      if callback
+        begin
+          callback.call(self)
+        rescue Exception => e
+          @callback_exceptions[state_name] = e
+        end
+      end
+
+    end
+
+    def state_to_const(state)
+      if state.kind_of?(Symbol)
+        STATE_SYMBOLS[state]
+      else
+        state
+      end
+    end
+
+    def state_to_sym(state)
+      if state.kind_of?(Symbol)
+        state
+      else
+        STATE_SYMBOLS_INVERTED[state]
+      end
+    end
+
+    # Finds the next state from _state_ that has a state_at time.
+    # Ex:
+    #   [0:10, nil, 0:15, 0:20]
+    #   next_state_at(0) -> 0:15
+    def next_state_at(state)
+      @state_at[state+1..-1].inspect
+      @state_at[state+1..-1].detect{ |time| !time.nil? }
     end
     
   end
